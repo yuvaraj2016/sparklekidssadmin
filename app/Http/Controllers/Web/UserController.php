@@ -1,0 +1,382 @@
+<?php
+
+namespace App\Http\Controllers\Web;
+
+use Auth;
+use Session;
+
+use App\Http\Controllers\Controller;
+use GuzzleHttp\Client;
+use GuzzleHttp\Exception\RequestException;
+use GuzzleHttp\Exception\BadResponseException;
+use Illuminate\Http\Request;
+
+class UserController extends Controller
+{
+
+    public function __construct()
+    {
+        $this->middleware('prevent-back-history');
+    }
+
+    public function login(Request $request)
+    {
+        //  $req = Request::create('/api/login','POST',array("{'username':'1234','password';'12321'}"),[],[],"http://restschool.hridham.com");
+        // $response = app()->handle($req);
+        try
+        {
+
+        $client = new Client();
+        $response = $client->request('POST', 'http://restschool.hridham.com/api/login', [
+            'form_params' => [
+                'username' => $request->username,
+                'password' => $request->password,
+            ]
+        ]);
+        // dd($res);
+        // return false;
+
+        if($response->getStatusCode() === 200)
+        {
+            // echo $response->getBody();
+        // return false;
+
+            $data = json_decode($response->getBody(),true);
+            Session::put('access_token',$data['token']);
+            //  echo Session::get('access_token');
+            //  return false;
+
+            //return view('pages.success')->with('message','Successfully Logged in');
+            return redirect('/albums')->with('success','Successfully Logged in');
+        }
+
+        }
+        catch(BadResponseException $ex)
+        {
+            $data = json_decode($ex->getResponse()->getBody()->getContents(), true);
+            $errors = [];
+
+            // session()->forget('access_token');
+
+            foreach($data as $k=>$v)
+                $errors[$k]=$v;
+            return redirect('/login')->with('error',"Error! Invalid Username And Password");
+            //return view('auth.register')->with(['error'=>$errors]);
+        }
+        if($response->getStatusCode() == 201)
+        {
+            return redirect('/albums')->with('success','Successfully Registered');
+        }
+        else
+        {
+            return 'Internal Server Error!<br>Check api/users/create<br>'.$response;
+        }
+
+        // else if($response->getStatusCode() === 401)
+        // {
+        //     return view('auth.login')->with('error','Invalid Username/Password');
+        //     // return view('auth.login')->with('error',[['Unauthorized']]);
+        // }
+        // else
+        // {
+        //     return 'Internal Server Error!<br>Check api/login<br>'.$response;
+        // }
+    }
+
+    public function registerform()
+    {
+
+        return view('auth.register');
+    }
+
+
+    public function register(Request $request)
+    {
+        try
+        {
+
+            $req = new Client;
+            $response = $req->request('POST', 'http://restschool.hridham.com/api/user/register', [
+                'form_params' => [
+                    'first_name' => $request->first_name,
+                    'last_name' => $request->last_name,
+                    'email' => $request->email,
+                    'username' => $request->username,
+                    'password' => $request->password,
+                    'password_confirmation' => $request->password_confirmation,
+                    'address' => $request->address,
+                    'gender' => $request->gender,
+                    'mobile' => $request->mobile,
+                ]
+            ]);
+
+            // $response = $req->request('POST','http://restschool.hridham.com/api/user/register',[
+            //         'multipart' => [
+            //             [
+            //                 'name' => 'first_name',
+            //                 'contents' => $request->first_name
+            //             ],
+            //             [
+            //                 'name' => 'last_name',
+            //                 'contents' => $request->last_name
+            //             ],
+            //             // [
+            //             //     'name' => 'profile_picture',
+            //             //     'contents' => ($request->file('profile_picture') === null)?'':fopen($request->file('profile_picture'), 'r'),
+            //             //     'filename' => ($request->file('profile_picture') === null)?'':$request->file('profile_picture')->getClientOriginalName()
+            //             // ],
+            //             [
+            //                 'name' => 'email',
+            //                 'contents' => $request->email
+            //             ],
+            //             [
+            //                 'name' => 'username',
+            //                 'contents' => $request->username
+            //             ],
+            //             [
+            //                 'name' => 'password',
+            //                 'contents' => $request->password
+            //             ],
+            //             [
+            //                 'name' => 'password_confirmation',
+            //                 'contents' => $request->password_confirmation
+            //             ],
+            //             [
+            //                 'name' => 'address',
+            //                 'contents' => $request->address
+            //             ],
+            //             [
+            //                 'name' => 'gender',
+            //                 'contents' => $request->gender
+            //             ],
+            //             [
+            //                 'name' => 'mobile',
+            //                 'contents' => $request->mobile
+            //             ]
+            //         ]
+            // ]);
+
+
+        }
+        catch(BadResponseException $ex)
+        {
+
+            $data = json_decode($ex->getResponse()->getBody()->getContents(), true);
+            $errors = [];
+            foreach($data as $k=>$v)
+                $errors[$k]=$v;
+                // dd($errors);
+                return redirect('/register')->with(['error'=>$errors]);
+            //return view('auth.register')->with(['error'=>$errors]);
+            // return redirect('/register')->with('errors',$errors);
+            // return view('auth.register')->with('errors',$errors);
+        }
+        if($response->getStatusCode() == 201)
+        {
+            return redirect('/login')->with('success','You have Successfully Registered. Please login');
+        }
+        else
+        {
+            return 'Internal Server Error!<br>Check api/users/create<br>'.$response;
+        }
+    }
+
+    public function index()
+    {
+        try
+        {
+            $request_user = Request::create('/api/users','GET',
+                                            [],
+                                            [],[], $_SERVER);
+            $response = app()->handle($request_user);
+            if($response->status()==200)
+            {
+                $data = json_decode($response->content(),true);
+
+                //return redirect('/users')->with('users',$data['users']);
+                return view('pages.users')->with('users',$data['users']);
+            }
+            else
+            {
+                return 'Internal Server Error!<br>Check api/users/create<br>'.$response;
+            }
+        }
+        catch(\Exception $e)
+        {
+            return $e->getMessage();
+        }
+    }
+
+    public function myaccount()
+    {
+        try
+        {
+            $request = Request::create('/api/users/'.Auth::user()->username,'GET',
+                                        [],
+                                        [],[], $_SERVER);
+            $response = app()->handle($request);
+            if($response->status() == 200)
+            {
+                $data = json_decode($response->content(), true);
+
+                return view('pages.myaccount')->with('data',$data['data'][0]);
+            }
+            else if($response->status() == 404)
+            {
+                return view('pages.error')->with('message','User not found');
+            }
+            else
+            {
+                return 'Internal Server Error!<br>Check api/users/show<br>'.$response;
+            }
+        }
+        catch(\Exception $e)
+        {
+            return $e->getMessage();
+        }
+    }
+
+    public function show($id)
+    {
+        try
+        {
+            $request_user = Request::create('/api/users/'.$id,'GET',
+                                            [],
+                                            [],[], $_SERVER);
+            $response = app()->handle($request_user);
+
+            if($response->status()==200)
+            {
+                $data = json_decode($response->content(),true);
+
+                return view('user.userpage')->with('user',$data['data'][0])
+                        ->with('albums',$data['albums']);
+            }
+            else if($response->status() == 404)
+            {
+                //return view('pages.error')->with('message','User not found');
+                return redirect('/users')->with('error','User not found');
+            }
+            else
+            {
+                return 'Internal Server Error!<br>Check api/users/show<br>'.$response;
+            }
+        }
+        catch(\Exception $e)
+        {
+            return $e->getMessage();
+        }
+
+    }
+
+    public function edituser($id)
+    {
+        if(Auth::check() and Auth::user()->username === $id)
+            return view('user.edituser')->with('user',Auth::user());
+        else
+            return redirect('/home')->with('error','Unauthorized Acess');
+    }
+    public function edit(Request $request, $id)
+    {
+        try
+        {
+            $req = new Client;
+            $response = $req->request('POST',url('/').'/api/users/'.$id,[
+                    'headers' => [
+                        'Authorization' => 'Bearer ' . Session::get('access_token'),
+                        'Accept'        => 'application/json',
+                    ],
+                    'multipart' => [
+                        [
+                            'name' => 'first_name',
+                            'contents' => $request->first_name
+                        ],
+                        [
+                            'name' => 'last_name',
+                            'contents' => $request->last_name
+                        ],
+                        [
+                            'name' => 'profile_picture',
+                            'contents' => ($request->file('profile_picture') === null)?'':fopen($request->file('profile_picture'), 'r'),
+                            'filename' => ($request->file('profile_picture') === null)?'':$request->file('profile_picture')->getClientOriginalName()
+                        ],
+                        [
+                            'name' => 'gender',
+                            'contents' => $request->gender
+                        ],
+                        [
+                            'name' => 'password',
+                            'contents' => $request->password
+                        ],
+                        [
+                            'name' => 'password_confirmation',
+                            'contents' => $request->password_confirmation
+                        ],
+                        [
+                            'name' => 'email',
+                            'contents' => $request->email
+                        ],
+                        [
+                            'name' => '_method',
+                            'contents' => 'PUT'
+                        ]
+                    ]
+            ]);
+        }
+        catch(BadResponseException $ex)
+        {
+            $data = json_decode($ex->getResponse()->getBody()->getContents(), true);
+            $errors = [];
+            foreach($data as $k=>$v)
+                $errors[$k]=$v;
+            //return view('user.edituser')->with(['error'=>$errors]);
+            return redirect('/users/'.$id.'/edit')->with(['error'=>$errors]);
+        }
+        if($response->getStatusCode() == 200)
+        {
+            return redirect('/home')->with('success','Successfully Edited');
+            //return view('pages.unauth')->with(['message' => 'Successfully Edited']);
+        }
+        else
+        {
+            return 'Internal Server Error!<br>Check api/users/edit<br>'.$response;
+        }
+    }
+
+    public function delete($id)
+    {
+        try
+        {
+            $request = new Client;
+            $response = $request->request('DELETE',url('/').'/api/users/'.$id,[
+                                        'headers' => [
+                                            'Authorization' => 'Bearer ' . Session::get('access_token'),
+                                            'Accept'        => 'application/json',
+                                        ]
+            ]);
+            if($response->getStatusCode()==200)
+            {
+                return redirect('/login')->with('success','Successfully Deleted!');
+            }
+            else if($response->getStatusCode() == 401)
+            {
+                return redirect('/home')->with('error','Not Authorized');
+                //return view('pages.unauth')->with('message','Not authorized');
+            }
+            else if($response->getStatusCode() == 404)
+            {
+                return redirect('/home')->with('error','No Such User');
+                //return view('pages.error')->with('message','User not found');
+            }
+            else
+            {
+                return 'Internal Server Error!<br>Check api/users/show<br>'.$response;
+            }
+
+        }
+        catch(\Exception $e)
+        {
+            return $e->getMessage();
+        }
+    }
+}
